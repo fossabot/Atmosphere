@@ -49,6 +49,17 @@ extern "C" {
     void __libnx_initheap(void);
     void __appInit(void);
     void __appExit(void);
+
+    /* Exception handling. */
+    alignas(16) u8 __nx_exception_stack[0x1000];
+    u64 __nx_exception_stack_size = sizeof(__nx_exception_stack);
+    void __libnx_exception_handler(ThreadExceptionDump *ctx);
+    u64 __stratosphere_title_id = TitleId_Boot;
+    void __libstratosphere_exception_handler(AtmosphereFatalErrorContext *ctx);
+}
+
+void __libnx_exception_handler(ThreadExceptionDump *ctx) {
+    StratosphereCrashHandler(ctx);
 }
 
 void __libnx_initheap(void) {
@@ -69,30 +80,27 @@ void __appInit(void) {
     SetFirmwareVersionForLibnx();
 
     /* Initialize services we need (TODO: NCM) */
-    rc = smInitialize();
-    if (R_FAILED(rc)) {
-        std::abort();
-    }
-    
-    rc = fsInitialize();
-    if (R_FAILED(rc)) {
-        std::abort();
-    }
-    
-    rc = splInitialize();
-    if (R_FAILED(rc)) {
-        std::abort();
-    }
-    
-    rc = pmshellInitialize();
-    if (R_FAILED(rc)) {
-        std::abort();
-    }
-    
-    rc = fsdevMountSdmc();
-    if (R_FAILED(rc)) {
-        std::abort();
-    }
+    DoWithSmSession([&]() {
+        rc = fsInitialize();
+        if (R_FAILED(rc)) {
+            std::abort();
+        }
+        
+        rc = splInitialize();
+        if (R_FAILED(rc)) {
+            std::abort();
+        }
+        
+        rc = pmshellInitialize();
+        if (R_FAILED(rc)) {
+            std::abort();
+        }
+        
+        rc = fsdevMountSdmc();
+        if (R_FAILED(rc)) {
+            std::abort();
+        }
+    });
     
     CheckAtmosphereVersion(CURRENT_ATMOSPHERE_VERSION);
 }
@@ -103,7 +111,6 @@ void __appExit(void) {
     pmshellExit(); 
     splExit();
     fsExit();
-    smExit();
 }
 
 typedef enum {

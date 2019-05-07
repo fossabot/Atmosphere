@@ -25,6 +25,7 @@
 #include "ini.h"
 
 #include "set_mitm/setsys_settings_items.hpp"
+#include "bpc_mitm/bpcmitm_reboot_manager.hpp"
 
 static FsFileSystem g_sd_filesystem = {0};
 static HosSignal g_sd_signal;
@@ -77,15 +78,17 @@ static bool IsHexadecimal(const char *str) {
 
 void Utils::InitializeThreadFunc(void *args) {
     /* Get required services. */
-    Handle tmp_hnd = 0;
-    static const char * const required_active_services[] = {"pcv", "gpio", "pinmux", "psc:c"};
-    for (unsigned int i = 0; i < sizeof(required_active_services) / sizeof(required_active_services[0]); i++) {
-        if (R_FAILED(smGetServiceOriginal(&tmp_hnd, smEncodeName(required_active_services[i])))) {
-            /* TODO: Panic */
-        } else {
-            svcCloseHandle(tmp_hnd);   
+    DoWithSmSession([&]() {
+        Handle tmp_hnd = 0;
+        static const char * const required_active_services[] = {"pcv", "gpio", "pinmux", "psc:c"};
+        for (unsigned int i = 0; i < sizeof(required_active_services) / sizeof(required_active_services[0]); i++) {
+            if (R_FAILED(smGetServiceOriginal(&tmp_hnd, smEncodeName(required_active_services[i])))) {
+                /* TODO: Panic */
+            } else {
+                svcCloseHandle(tmp_hnd);   
+            }
         }
-    }
+    });
     
     /* Mount SD. */
     while (R_FAILED(fsMountSdcard(&g_sd_filesystem))) {
@@ -196,7 +199,11 @@ void Utils::InitializeThreadFunc(void *args) {
     Utils::RefreshConfiguration();
     
     /* Initialize set:sys. */
-    setsysInitialize();
+    DoWithSmSession([&]() {
+        if (R_FAILED(setsysInitialize())) {
+            std::abort();
+        }
+    });
     
     /* Signal SD is initialized. */
     g_has_initialized = true;
@@ -208,13 +215,15 @@ void Utils::InitializeThreadFunc(void *args) {
     g_sd_signal.Signal();
     
     /* Initialize HID. */
-    {
-        
-        while (R_FAILED(hidInitialize())) {
+    while (!g_has_hid_session) {
+        DoWithSmSession([&]() {
+            if (R_SUCCEEDED(hidInitialize())) {
+                g_has_hid_session = true;
+            }
+        });
+        if (!g_has_hid_session) {
             svcSleepThread(1000000ULL);
         }
-        
-        g_has_hid_session = true;
     }
 }
 
@@ -651,4 +660,8 @@ Result Utils::GetSettingsItemBooleanValue(const char *name, const char *key, boo
         }
     }
     return rc;
+}
+
+void Utils::RebootToFatalError(AtmosphereFatalErrorContext *ctx) {
+    BpcRebootManager::RebootForFatalError(ctx);
 }

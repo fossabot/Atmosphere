@@ -38,6 +38,17 @@ extern "C" {
     void __libnx_initheap(void);
     void __appInit(void);
     void __appExit(void);
+
+    /* Exception handling. */
+    alignas(16) u8 __nx_exception_stack[0x1000];
+    u64 __nx_exception_stack_size = sizeof(__nx_exception_stack);
+    void __libnx_exception_handler(ThreadExceptionDump *ctx);
+    u64 __stratosphere_title_id = TitleId_Creport;
+    void __libstratosphere_exception_handler(AtmosphereFatalErrorContext *ctx);
+}
+
+void __libnx_exception_handler(ThreadExceptionDump *ctx) {
+    StratosphereCrashHandler(ctx);
 }
 
 
@@ -57,16 +68,13 @@ void __appInit(void) {
     Result rc;
     
     SetFirmwareVersionForLibnx();
-
-    rc = smInitialize();
-    if (R_FAILED(rc)) {
-        fatalSimple(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
-    }
     
-    rc = fsInitialize();
-    if (R_FAILED(rc)) {
-        fatalSimple(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
-    }
+    DoWithSmSession([&]() {
+        rc = fsInitialize();
+        if (R_FAILED(rc)) {
+            fatalSimple(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
+        }
+    });
     
     rc = fsdevMountSdmc();
     if (R_FAILED(rc)) {
@@ -78,7 +86,6 @@ void __appExit(void) {
     /* Cleanup services. */
     fsdevUnmountAll();
     fsExit();
-    smExit();
 }
 
 static u64 creport_parse_u64(char *s) {
@@ -116,10 +123,12 @@ int main(int argc, char **argv) {
     if (g_Creport.WasSuccessful()) {
         g_Creport.SaveReport();
         
-        if (R_SUCCEEDED(nsdevInitialize())) {
-            nsdevTerminateProcess(crashed_pid);
-            nsdevExit();
-        }
+        DoWithSmSession([&]() {
+            if (R_SUCCEEDED(nsdevInitialize())) {
+                nsdevTerminateProcess(crashed_pid);
+                nsdevExit();
+            }
+        });
         
         /* Don't fatal if we have extra info. */
         if (kernelAbove500()) {

@@ -38,8 +38,23 @@ extern "C" {
     void __libnx_initheap(void);
     void __appInit(void);
     void __appExit(void);
+
+    /* Exception handling. */
+    alignas(16) u8 __nx_exception_stack[0x1000];
+    u64 __nx_exception_stack_size = sizeof(__nx_exception_stack);
+    void __libnx_exception_handler(ThreadExceptionDump *ctx);
+    u64 __stratosphere_title_id = 0x010041544D530000ul;
+    void __libstratosphere_exception_handler(AtmosphereFatalErrorContext *ctx);
 }
 
+void __libnx_exception_handler(ThreadExceptionDump *ctx) {
+    StratosphereCrashHandler(ctx);
+}
+
+void __libstratosphere_exception_handler(AtmosphereFatalErrorContext *ctx) {
+    /* We're bpc-mitm (or ams_mitm, anyway), so manually reboot to fatal error. */
+    Utils::RebootToFatalError(ctx);
+}
 
 void __libnx_initheap(void) {
 	void*  addr = nx_inner_heap;
@@ -58,15 +73,12 @@ void __appInit(void) {
     
     SetFirmwareVersionForLibnx();
     
-    rc = smInitialize();
-    if (R_FAILED(rc)) {
-        fatalSimple(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
-    }
-    
-    rc = fsInitialize();
-    if (R_FAILED(rc)) {
-        fatalSimple(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
-    }
+    DoWithSmSession([&]() {
+        rc = fsInitialize();
+        if (R_FAILED(rc)) {
+            std::abort();
+        }
+    });
     
     CheckAtmosphereVersion(CURRENT_ATMOSPHERE_VERSION);
 }
@@ -74,7 +86,6 @@ void __appInit(void) {
 void __appExit(void) {
     /* Cleanup services. */
     fsExit();
-    smExit();
 }
 
 int main(int argc, char **argv)
@@ -85,10 +96,10 @@ int main(int argc, char **argv)
     LaunchAllMitmModules();
 
     if (R_FAILED(initializer_thread.Initialize(&Utils::InitializeThreadFunc, NULL, 0x4000, 0x15))) {
-        /* TODO: Panic. */
+        std::abort();
     }
     if (R_FAILED(initializer_thread.Start())) {
-        /* TODO: Panic. */
+        std::abort();
     }
         
     /* Wait for all mitm modules to end. */

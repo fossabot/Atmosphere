@@ -18,7 +18,9 @@
 #include <switch.h>
 #include <stratosphere.hpp>
 
-#define IRAM_PAYLOAD_MAX_SIZE 0x2F000
+#define IRAM_BASE             0x40000000ull
+#define IRAM_SIZE             0x40000
+#define IRAM_PAYLOAD_MAX_SIZE 0x2E000
 #define IRAM_PAYLOAD_BASE 0x40010000ull
 
 enum class BpcRebootType : u32 {
@@ -31,4 +33,5 @@ class BpcRebootManager {
     public:
         static void Initialize();
         static Result PerformReboot();
+        static void RebootForFatalError(AtmosphereFatalErrorContext *ctx);
 };
