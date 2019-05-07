@@ -1,5 +1,5 @@
-
 ![Banner](img/banner.png?raw=true)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F2g4y1%2FAtmosphere.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2F2g4y1%2FAtmosphere?ref=badge_shield)
 =====
 
 ![License](https://img.shields.io/badge/License-GPLv2-blue.svg)
@@ -38,3 +38,7 @@ In no particular order, we credit the following for their invaluable contributio
 * __jaames__ for designing and providing Atmosphère's graphical resources.
 * Everyone who submitted entries for Atmosphère's [splash design contest](https://github.com/Atmosphere-NX/Atmosphere-splashes).
 * _All those who actively contribute to the Atmosphère repository._
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F2g4y1%2FAtmosphere.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2F2g4y1%2FAtmosphere?ref=badge_large)
